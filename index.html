@@ -8,7 +8,9 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
   <style>
-    * { box-sizing: border-box; }
+    * {
+      box-sizing: border-box;
+    }
 
     body {
       margin: 0;
@@ -74,6 +76,16 @@
       background: #6f86a5;
     }
 
+    .secondary-btn {
+      background: #1B2F4E;
+      color: white;
+      border: 1px solid #8398B6;
+    }
+
+    .secondary-btn:hover {
+      background: #243b60;
+    }
+
     .timer {
       font-size: 40px;
       margin: 20px 0 10px;
@@ -87,7 +99,7 @@
     }
 
     .info-box {
-      background: rgba(255,255,255,0.08);
+      background: rgba(255, 255, 255, 0.08);
       color: white;
       padding: 12px;
       border-radius: 10px;
@@ -117,16 +129,6 @@
       border-radius: 12px;
       padding: 18px;
       margin-top: 20px;
-    }
-
-    .secondary-btn {
-      background: #1B2F4E;
-      color: white;
-      border: 1px solid #8398B6;
-    }
-
-    .secondary-btn:hover {
-      background: #243b60;
     }
 
     .hidden {
@@ -201,7 +203,7 @@
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/minified/html5-qrcode.min.js"></script>
 
   <script>
     const destinationLat = 46.989778;
@@ -217,7 +219,7 @@
     let playerAccuracyCircle = null;
     let mapInitialized = false;
     let scannerStarted = false;
-    let qrScanner = null;
+    let scanner = null;
     let raceFinished = false;
     let currentNickname = "";
 
@@ -367,60 +369,49 @@
       return R * c;
     }
 
-    async function startScanner() {
+    function startScanner() {
       if (scannerStarted || raceFinished) return;
 
-      const cameraStatus = document.getElementById("cameraStatus");
       const reader = document.getElementById("reader");
+      const cameraStatus = document.getElementById("cameraStatus");
+
       reader.classList.remove("hidden");
+      reader.innerHTML = "";
       cameraStatus.innerText = "Caméra : démarrage...";
 
-      try {
-        const devices = await Html5Qrcode.getCameras();
+      scanner = new Html5QrcodeScanner(
+        "reader",
+        {
+          fps: 10,
+          qrbox: 250,
+          rememberLastUsedCamera: true,
+          supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
+          aspectRatio: 1.0
+        },
+        false
+      );
 
-        if (!devices || devices.length === 0) {
-          cameraStatus.innerText = "Caméra : aucune caméra détectée.";
-          document.getElementById("retryBtn").classList.remove("hidden");
-          return;
-        }
+      scannerStarted = true;
 
-        qrScanner = new Html5Qrcode("reader");
-        scannerStarted = true;
+      scanner.render(
+        (decodedText) => {
+          const cleanText = decodedText.trim();
+          cameraStatus.innerText = "QR détecté : " + cleanText;
 
-        const preferredCameraId = devices[devices.length - 1].id;
+          if (cleanText !== expectedQrText) {
+            cameraStatus.innerText = "QR détecté, mais ce n’est pas le bon : " + cleanText;
+            return;
+          }
 
-        await qrScanner.start(
-          preferredCameraId,
-          {
-            fps: 10,
-            qrbox: { width: 220, height: 220 }
-          },
-          onScanSuccess,
-          () => {}
-        );
+          finishRace();
+        },
+        () => {}
+      );
 
-        document.getElementById("scanBtn").innerText = "Scanner en cours...";
-        document.getElementById("scanBtn").disabled = true;
-        document.getElementById("retryBtn").classList.add("hidden");
-        cameraStatus.innerText = "Caméra : active. Pointe-la vers le QR final.";
-      } catch (err) {
-        scannerStarted = false;
-        console.error(err);
-        cameraStatus.innerText = "Caméra : impossible à lancer. Vérifie les autorisations.";
-        document.getElementById("retryBtn").classList.remove("hidden");
-      }
-    }
-
-    function onScanSuccess(decodedText) {
-      const cleanText = decodedText.trim();
-
-      if (cleanText !== expectedQrText) {
-        document.getElementById("cameraStatus").innerText =
-          "QR détecté, mais ce n’est pas le bon.";
-        return;
-      }
-
-      finishRace();
+      document.getElementById("scanBtn").disabled = true;
+      document.getElementById("scanBtn").innerText = "Scanner en cours...";
+      document.getElementById("retryBtn").classList.remove("hidden");
+      cameraStatus.innerText = "Caméra : active. Pointe-la vers le QR final.";
     }
 
     async function finishRace() {
@@ -435,10 +426,9 @@
         watchId = null;
       }
 
-      if (qrScanner && scannerStarted) {
+      if (scanner) {
         try {
-          await qrScanner.stop();
-          await qrScanner.clear();
+          await scanner.clear();
         } catch (e) {
           console.error(e);
         }
@@ -460,13 +450,12 @@
     }
 
     async function restartScannerOnly() {
-      try {
-        if (qrScanner && scannerStarted) {
-          await qrScanner.stop();
-          await qrScanner.clear();
+      if (scanner) {
+        try {
+          await scanner.clear();
+        } catch (e) {
+          console.error(e);
         }
-      } catch (e) {
-        console.error(e);
       }
 
       scannerStarted = false;
@@ -486,13 +475,12 @@
         watchId = null;
       }
 
-      try {
-        if (qrScanner && scannerStarted) {
-          await qrScanner.stop();
-          await qrScanner.clear();
+      if (scanner) {
+        try {
+          await scanner.clear();
+        } catch (e) {
+          console.error(e);
         }
-      } catch (e) {
-        console.error(e);
       }
 
       scannerStarted = false;
