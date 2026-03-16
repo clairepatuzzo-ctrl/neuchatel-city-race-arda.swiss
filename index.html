@@ -1,38 +1,180 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <title>Neuchâtel City Race</title>
 
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
 <style>
+
 body{
-font-family:Arial;
+margin:0;
+font-family:Arial, sans-serif;
+background:#1B2F4E;
+color:#FBEF82;
 text-align:center;
-background:#111;
-color:white;
-padding:40px;
+padding:30px;
+}
+
+.container{
+max-width:500px;
+margin:auto;
+}
+
+.card{
+background:#455D82;
+padding:25px;
+border-radius:15px;
+margin-top:20px;
+}
+
+h1{
+margin-top:0;
+}
+
+input{
+width:100%;
+padding:14px;
+border:none;
+border-radius:8px;
+font-size:16px;
+margin-top:10px;
 }
 
 button{
-padding:15px 25px;
+width:100%;
+padding:15px;
 font-size:18px;
 border:none;
-border-radius:8px;
-background:#00ff88;
+border-radius:10px;
+background:#8398B6;
+color:white;
+font-weight:bold;
+margin-top:15px;
 cursor:pointer;
 }
+
+button:hover{
+background:#6f86a5;
+}
+
+.timer{
+font-size:40px;
+margin:20px 0;
+font-weight:bold;
+}
+
+#map{
+height:300px;
+border-radius:12px;
+margin-top:20px;
+}
+
 </style>
 
 </head>
 
+
 <body>
+
+<div class="container">
 
 <h1>Neuchâtel City Race</h1>
 
-<p>Scanne le QR code du panneau pour commencer la course.</p>
+<div id="startScreen" class="card">
 
-<button>Commencer</button>
+<p>Entre ton pseudo pour commencer la course.</p>
+
+<input id="nickname" placeholder="Ton pseudo">
+
+<button onclick="startGame()">Commencer la course</button>
+
+</div>
+
+
+<div id="gameScreen" class="card" style="display:none;">
+
+<h2 id="playerName"></h2>
+
+<div class="timer" id="timer">00:00</div>
+
+<p>Trouve le deuxième QR code.</p>
+
+<div id="map"></div>
+
+</div>
+
+</div>
+
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+
+let startTime;
+let timerInterval;
+
+function startGame(){
+
+let nickname=document.getElementById("nickname").value;
+
+if(!nickname){
+alert("Entre un pseudo !");
+return;
+}
+
+document.getElementById("playerName").innerText="Bonne chance "+nickname+" !";
+
+document.getElementById("startScreen").style.display="none";
+document.getElementById("gameScreen").style.display="block";
+
+startTime=Date.now();
+
+timerInterval=setInterval(updateTimer,200);
+
+initMap();
+
+}
+
+
+function updateTimer(){
+
+let elapsed=Date.now()-startTime;
+
+let seconds=Math.floor(elapsed/1000);
+
+let minutes=Math.floor(seconds/60);
+
+seconds=seconds%60;
+
+if(minutes<10)minutes="0"+minutes;
+if(seconds<10)seconds="0"+seconds;
+
+document.getElementById("timer").innerText=minutes+":"+seconds;
+
+}
+
+
+
+function initMap(){
+
+let map=L.map('map').setView([46.989778,6.929028],15);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+maxZoom:19
+}).addTo(map);
+
+let marker=L.marker([46.989778,6.929028]).addTo(map);
+
+marker.bindPopup("Destination du QR code").openPopup();
+
+}
+
+</script>
 
 </body>
-</html>
+</html> 
