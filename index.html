@@ -1,180 +1,182 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Neuchâtel City Race</title>
 
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
-<title>Neuchâtel City Race</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
 
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #1B2F4E;
+      color: #FBEF82;
+      text-align: center;
+      padding: 30px;
+    }
 
-<style>
+    .container {
+      max-width: 500px;
+      margin: 0 auto;
+    }
 
-body{
-margin:0;
-font-family:Arial, sans-serif;
-background:#1B2F4E;
-color:#FBEF82;
-text-align:center;
-padding:30px;
-}
+    .card {
+      background: #455D82;
+      padding: 25px;
+      border-radius: 15px;
+      margin-top: 20px;
+    }
 
-.container{
-max-width:500px;
-margin:auto;
-}
+    h1 {
+      margin-top: 0;
+      margin-bottom: 24px;
+      font-size: 3rem;
+    }
 
-.card{
-background:#455D82;
-padding:25px;
-border-radius:15px;
-margin-top:20px;
-}
+    p {
+      margin-bottom: 18px;
+    }
 
-h1{
-margin-top:0;
-}
+    input {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      margin-top: 10px;
+      margin-bottom: 15px;
+    }
 
-input{
-width:100%;
-padding:14px;
-border:none;
-border-radius:8px;
-font-size:16px;
-margin-top:10px;
-}
+    button {
+      width: 100%;
+      padding: 15px;
+      font-size: 18px;
+      border: none;
+      border-radius: 10px;
+      background: #8398B6;
+      color: white;
+      font-weight: bold;
+      margin-top: 15px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
 
-button{
-width:100%;
-padding:15px;
-font-size:18px;
-border:none;
-border-radius:10px;
-background:#8398B6;
-color:white;
-font-weight:bold;
-margin-top:15px;
-cursor:pointer;
-}
+    button:hover {
+      background: #6f86a5;
+    }
 
-button:hover{
-background:#6f86a5;
-}
+    .timer {
+      font-size: 40px;
+      margin: 20px 0;
+      font-weight: bold;
+    }
 
-.timer{
-font-size:40px;
-margin:20px 0;
-font-weight:bold;
-}
+    #map {
+      height: 300px;
+      border-radius: 12px;
+      margin-top: 20px;
+      overflow: hidden;
+    }
 
-#map{
-height:300px;
-border-radius:12px;
-margin-top:20px;
-}
+    @media (max-width: 600px) {
+      body {
+        padding: 20px;
+      }
 
-</style>
+      h1 {
+        font-size: 2.2rem;
+      }
 
+      .card {
+        padding: 20px;
+      }
+    }
+  </style>
 </head>
 
-
 <body>
+  <div class="container">
+    <h1>Neuchâtel City Race</h1>
 
-<div class="container">
+    <div id="startScreen" class="card">
+      <p>Entre ton pseudo pour commencer la course.</p>
+      <input id="nickname" placeholder="Ton pseudo" />
+      <button onclick="startGame()">Commencer la course</button>
+    </div>
 
-<h1>Neuchâtel City Race</h1>
+    <div id="gameScreen" class="card" style="display: none;">
+      <h2 id="playerName"></h2>
+      <div class="timer" id="timer">00:00</div>
+      <p>Trouve le deuxième QR code.</p>
+      <div id="map"></div>
+    </div>
+  </div>
 
-<div id="startScreen" class="card">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-<p>Entre ton pseudo pour commencer la course.</p>
+  <script>
+    let startTime;
+    let timerInterval;
+    let mapInitialized = false;
 
-<input id="nickname" placeholder="Ton pseudo">
+    function startGame() {
+      const nickname = document.getElementById("nickname").value.trim();
 
-<button onclick="startGame()">Commencer la course</button>
+      if (!nickname) {
+        alert("Entre un pseudo !");
+        return;
+      }
 
-</div>
+      document.getElementById("playerName").innerText = "Bonne chance " + nickname + " !";
+      document.getElementById("startScreen").style.display = "none";
+      document.getElementById("gameScreen").style.display = "block";
 
+      startTime = Date.now();
+      timerInterval = setInterval(updateTimer, 200);
 
-<div id="gameScreen" class="card" style="display:none;">
+      if (!mapInitialized) {
+        initMap();
+        mapInitialized = true;
+      }
+    }
 
-<h2 id="playerName"></h2>
+    function updateTimer() {
+      const elapsed = Date.now() - startTime;
+      let seconds = Math.floor(elapsed / 1000);
+      let minutes = Math.floor(seconds / 60);
 
-<div class="timer" id="timer">00:00</div>
+      seconds = seconds % 60;
 
-<p>Trouve le deuxième QR code.</p>
+      if (minutes < 10) minutes = "0" + minutes;
+      if (seconds < 10) seconds = "0" + seconds;
 
-<div id="map"></div>
+      document.getElementById("timer").innerText = minutes + ":" + seconds;
+    }
 
-</div>
+    function initMap() {
+      const destinationLat = 46.989778;
+      const destinationLng = 6.929028;
 
-</div>
+      const map = L.map("map").setView([destinationLat, destinationLng], 15);
 
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: "&copy; OpenStreetMap contributors"
+      }).addTo(map);
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+      const marker = L.marker([destinationLat, destinationLng]).addTo(map);
+      marker.bindPopup("Destination du QR code").openPopup();
 
-<script>
-
-let startTime;
-let timerInterval;
-
-function startGame(){
-
-let nickname=document.getElementById("nickname").value;
-
-if(!nickname){
-alert("Entre un pseudo !");
-return;
-}
-
-document.getElementById("playerName").innerText="Bonne chance "+nickname+" !";
-
-document.getElementById("startScreen").style.display="none";
-document.getElementById("gameScreen").style.display="block";
-
-startTime=Date.now();
-
-timerInterval=setInterval(updateTimer,200);
-
-initMap();
-
-}
-
-
-function updateTimer(){
-
-let elapsed=Date.now()-startTime;
-
-let seconds=Math.floor(elapsed/1000);
-
-let minutes=Math.floor(seconds/60);
-
-seconds=seconds%60;
-
-if(minutes<10)minutes="0"+minutes;
-if(seconds<10)seconds="0"+seconds;
-
-document.getElementById("timer").innerText=minutes+":"+seconds;
-
-}
-
-
-
-function initMap(){
-
-let map=L.map('map').setView([46.989778,6.929028],15);
-
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-maxZoom:19
-}).addTo(map);
-
-let marker=L.marker([46.989778,6.929028]).addTo(map);
-
-marker.bindPopup("Destination du QR code").openPopup();
-
-}
-
-</script>
-
+      setTimeout(() => {
+        map.invalidateSize();
+      }, 200);
+    }
+  </script>
 </body>
-</html> 
+</html>
