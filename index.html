@@ -8,9 +8,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
   <style>
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
@@ -110,6 +108,7 @@
       overflow: hidden;
       border-radius: 12px;
       background: #1B2F4E;
+      min-height: 280px;
     }
 
     .success-box {
@@ -181,9 +180,14 @@
         Distance jusqu’à la destination : calcul en attente...
       </div>
 
+      <div class="info-box" id="cameraStatus">
+        Caméra : pas encore lancée.
+      </div>
+
       <div id="map"></div>
 
       <button id="scanBtn" onclick="startScanner()">Scanner le 2e QR code</button>
+      <button id="retryBtn" class="secondary-btn hidden" onclick="restartScannerOnly()">Relancer le scan</button>
 
       <div id="reader" class="hidden"></div>
 
@@ -233,24 +237,22 @@
       document.getElementById("gameScreen").classList.remove("hidden");
       document.getElementById("resultBox").classList.add("hidden");
       document.getElementById("reader").classList.add("hidden");
+      document.getElementById("retryBtn").classList.add("hidden");
+      document.getElementById("scanBtn").classList.remove("hidden");
       document.getElementById("scanBtn").disabled = false;
       document.getElementById("scanBtn").innerText = "Scanner le 2e QR code";
+      document.getElementById("cameraStatus").innerText = "Caméra : pas encore lancée.";
 
       startTime = Date.now();
 
-      if (timerInterval) {
-        clearInterval(timerInterval);
-      }
-
+      if (timerInterval) clearInterval(timerInterval);
       timerInterval = setInterval(updateTimer, 200);
 
       if (!mapInitialized) {
         initMap();
         mapInitialized = true;
       } else {
-        setTimeout(() => {
-          map.invalidateSize();
-        }, 200);
+        setTimeout(() => map.invalidateSize(), 200);
       }
 
       startGeolocation();
@@ -258,7 +260,6 @@
 
     function updateTimer() {
       if (raceFinished || !startTime) return;
-
       const elapsed = Date.now() - startTime;
       document.getElementById("timer").innerText = formatDuration(elapsed);
     }
@@ -267,11 +268,7 @@
       const totalSeconds = Math.floor(ms / 1000);
       const minutes = Math.floor(totalSeconds / 60);
       const seconds = totalSeconds % 60;
-
-      const mm = String(minutes).padStart(2, "0");
-      const ss = String(seconds).padStart(2, "0");
-
-      return mm + ":" + ss;
+      return String(minutes).padStart(2, "0") + ":" + String(seconds).padStart(2, "0");
     }
 
     function initMap() {
@@ -285,9 +282,7 @@
       destinationMarker = L.marker([destinationLat, destinationLng]).addTo(map);
       destinationMarker.bindPopup("Destination du 2e QR code");
 
-      setTimeout(() => {
-        map.invalidateSize();
-      }, 200);
+      setTimeout(() => map.invalidateSize(), 200);
     }
 
     function startGeolocation() {
@@ -318,8 +313,7 @@
       const lng = position.coords.longitude;
       const accuracy = position.coords.accuracy;
 
-      document.getElementById("locationStatus").innerText =
-        "Position du joueur : GPS actif";
+      document.getElementById("locationStatus").innerText = "Position du joueur : GPS actif";
 
       const distance = getDistanceMeters(lat, lng, destinationLat, destinationLng);
       document.getElementById("distanceStatus").innerText =
@@ -344,23 +338,16 @@
         playerAccuracyCircle.setRadius(accuracy);
       }
 
-      const bounds = L.latLngBounds(
-        [lat, lng],
-        [destinationLat, destinationLng]
-      );
+      const bounds = L.latLngBounds([lat, lng], [destinationLat, destinationLng]);
       map.fitBounds(bounds, { padding: [40, 40] });
     }
 
     function handleGeolocationError(error) {
       let message = "Impossible de récupérer la position du joueur.";
 
-      if (error.code === 1) {
-        message = "Autorisation GPS refusée. Active la localisation pour voir ta position.";
-      } else if (error.code === 2) {
-        message = "Position introuvable pour le moment.";
-      } else if (error.code === 3) {
-        message = "Le GPS met trop de temps à répondre.";
-      }
+      if (error.code === 1) message = "Autorisation GPS refusée. Active la localisation.";
+      if (error.code === 2) message = "Position introuvable pour le moment.";
+      if (error.code === 3) message = "Le GPS met trop de temps à répondre.";
 
       document.getElementById("locationStatus").innerText = message;
     }
@@ -368,7 +355,6 @@
     function getDistanceMeters(lat1, lon1, lat2, lon2) {
       const R = 6371000;
       const toRad = (deg) => deg * Math.PI / 180;
-
       const dLat = toRad(lat2 - lat1);
       const dLon = toRad(lon2 - lon1);
 
@@ -378,40 +364,59 @@
         Math.sin(dLon / 2) * Math.sin(dLon / 2);
 
       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
       return R * c;
     }
 
-    function startScanner() {
+    async function startScanner() {
       if (scannerStarted || raceFinished) return;
 
+      const cameraStatus = document.getElementById("cameraStatus");
       const reader = document.getElementById("reader");
       reader.classList.remove("hidden");
+      cameraStatus.innerText = "Caméra : démarrage...";
 
-      qrScanner = new Html5Qrcode("reader");
-      scannerStarted = true;
+      try {
+        const devices = await Html5Qrcode.getCameras();
 
-      qrScanner.start(
-        { facingMode: "environment" },
-        {
-          fps: 10,
-          qrbox: { width: 220, height: 220 }
-        },
-        onScanSuccess,
-        () => {}
-      ).then(() => {
+        if (!devices || devices.length === 0) {
+          cameraStatus.innerText = "Caméra : aucune caméra détectée.";
+          document.getElementById("retryBtn").classList.remove("hidden");
+          return;
+        }
+
+        qrScanner = new Html5Qrcode("reader");
+        scannerStarted = true;
+
+        const preferredCameraId = devices[devices.length - 1].id;
+
+        await qrScanner.start(
+          preferredCameraId,
+          {
+            fps: 10,
+            qrbox: { width: 220, height: 220 }
+          },
+          onScanSuccess,
+          () => {}
+        );
+
         document.getElementById("scanBtn").innerText = "Scanner en cours...";
         document.getElementById("scanBtn").disabled = true;
-      }).catch((err) => {
+        document.getElementById("retryBtn").classList.add("hidden");
+        cameraStatus.innerText = "Caméra : active. Pointe-la vers le QR final.";
+      } catch (err) {
         scannerStarted = false;
         console.error(err);
-        alert("Impossible d’ouvrir la caméra. Vérifie les autorisations.");
-      });
+        cameraStatus.innerText = "Caméra : impossible à lancer. Vérifie les autorisations.";
+        document.getElementById("retryBtn").classList.remove("hidden");
+      }
     }
 
     function onScanSuccess(decodedText) {
-      if (decodedText.trim() !== expectedQrText) {
-        alert("Ce n’est pas le bon QR code.");
+      const cleanText = decodedText.trim();
+
+      if (cleanText !== expectedQrText) {
+        document.getElementById("cameraStatus").innerText =
+          "QR détecté, mais ce n’est pas le bon.";
         return;
       }
 
@@ -423,9 +428,7 @@
 
       raceFinished = true;
 
-      if (timerInterval) {
-        clearInterval(timerInterval);
-      }
+      if (timerInterval) clearInterval(timerInterval);
 
       if (watchId !== null) {
         navigator.geolocation.clearWatch(watchId);
@@ -452,20 +455,44 @@
       document.getElementById("resultBox").classList.remove("hidden");
       document.getElementById("reader").classList.add("hidden");
       document.getElementById("scanBtn").classList.add("hidden");
+      document.getElementById("retryBtn").classList.add("hidden");
+      document.getElementById("cameraStatus").innerText = "Caméra : QR final validé.";
     }
 
-    function restartGame() {
-      if (timerInterval) {
-        clearInterval(timerInterval);
+    async function restartScannerOnly() {
+      try {
+        if (qrScanner && scannerStarted) {
+          await qrScanner.stop();
+          await qrScanner.clear();
+        }
+      } catch (e) {
+        console.error(e);
       }
+
+      scannerStarted = false;
+      document.getElementById("reader").innerHTML = "";
+      document.getElementById("reader").classList.add("hidden");
+      document.getElementById("scanBtn").disabled = false;
+      document.getElementById("scanBtn").innerText = "Scanner le 2e QR code";
+
+      startScanner();
+    }
+
+    async function restartGame() {
+      if (timerInterval) clearInterval(timerInterval);
 
       if (watchId !== null) {
         navigator.geolocation.clearWatch(watchId);
         watchId = null;
       }
 
-      if (qrScanner && scannerStarted) {
-        qrScanner.stop().then(() => qrScanner.clear()).catch(() => {});
+      try {
+        if (qrScanner && scannerStarted) {
+          await qrScanner.stop();
+          await qrScanner.clear();
+        }
+      } catch (e) {
+        console.error(e);
       }
 
       scannerStarted = false;
@@ -479,9 +506,12 @@
       document.getElementById("gameScreen").classList.add("hidden");
       document.getElementById("resultBox").classList.add("hidden");
       document.getElementById("reader").classList.add("hidden");
+      document.getElementById("reader").innerHTML = "";
       document.getElementById("scanBtn").classList.remove("hidden");
       document.getElementById("scanBtn").disabled = false;
       document.getElementById("scanBtn").innerText = "Scanner le 2e QR code";
+      document.getElementById("retryBtn").classList.add("hidden");
+      document.getElementById("cameraStatus").innerText = "Caméra : pas encore lancée.";
       document.getElementById("locationStatus").innerText =
         "Position du joueur : en attente d’autorisation GPS...";
       document.getElementById("distanceStatus").innerText =
